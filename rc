@@ -1,8 +1,6 @@
-#!/bin/bash
-
 #!/bin/bash  
   
-PS3='Choose your favorite application name number: ' # 设置提示符字串.  
+PS3='Choose your favorite application name number: '   
   
 echo  
   
@@ -13,6 +11,6 @@ do
   echo "Your favorite veggie is $RIP " 
   ssh  root@$RIP
   echo 
-  break  # 如果这里没有 'break' 会发生什么?  
+  break
 done  
 exit 0 
