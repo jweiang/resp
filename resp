@@ -1,0 +1,108 @@
+#!/bin/bash
+
+exit_with_help()
+{
+    echo "Usage: resp [OPTION] PATTERN
+        Options:
+            -u 每台机器发送一条命令;
+            -c 远程执行的命令行;
+            -e 扩展模式，将远程命令中的\${flag}字符串替换为服务器标志(eg:jw_1)
+            -s 不更新服务器列表
+            -h 打印本帮助信息;
+        eg:     resp -u -c 'ls' 'jw_.*'
+        eg2:    resp -e -c 'grep '\''title'\'' /app/\${flag}/index.html' 'jw_8' 
+        "
+    exit 0 
+}
+#默认参数
+uniq="false"
+expand="false"
+cmd=""
+pattern=""
+static="false"
+
+while getopts ":usec:h" optname
+    do
+        case "$optname" in 
+            "u")
+                uniq="true";
+                ;;
+            "c")
+                cmd="$OPTARG"
+                ;;
+            "e")
+                expand="true"
+                ;;
+            "s")
+                static="true";
+                ;;
+            "?")
+                echo "Unkown option $OPTARG"
+                exit_with_help;
+                ;;
+            ":")
+                echo "No arugument value for option $OPTARG"
+                exit_with_help;
+                ;;
+            "h")
+                exit_with_help;
+                ;;
+            "*")
+                echo "Unsupported option [$optname]"
+                exit_with_help;
+                ;;
+        esac
+    done
+
+pattern=${@:$OPTIND}
+
+if [ -z "$pattern" ];
+then
+    echo "Pattern must be given"
+    exit_with_help;
+fi
+
+if [ -f ~/.lshost/jw -a $static == "false" ];
+then
+    rm -f ~/.lshost/jw
+    wget -q 'http://127.0.0.1/jw' -P ~/.lshost
+fi
+
+servers=`grep -E "$pattern" ~/.lshost/jw` 
+if [ $uniq == "true" ];
+then
+    servers=`echo $servers|awk -F '@' 'BEGIN{RS=" "}{dict[$2]=$1}END{for(i in dict){print dict[i]"@"i}}'`
+fi
+
+if [ -z "$cmd" ];
+then
+    for i in $servers;
+    do
+        echo $i
+    done
+else
+    for i in $servers;
+    do
+        host=`echo $i |awk -F'@' '{print $2}'`
+        server=`echo $i |awk -F'@' '{print $1}'`
+
+        if [ $expand == "true" ];
+        then
+            real_cmd=`echo "${cmd}"|sed 's/${flag}/'${server}'/g'`
+        else
+            real_cmd=$cmd
+        fi
+
+        echo -n $i":	"
+        echo -e "\e[0;34;1m[$real_cmd]\e[0m"
+        ssh  -p2277 $host   "$real_cmd" &>~/.lshost/stdout
+        if [ $?  -ne 0 ];
+        then
+            echo -e "\e[0;31;1m[FAIL]\e[0m";
+        else
+            echo -e "\e[0;32;1m[OK]\e[0m";
+        fi
+        cat ~/.lshost/stdout
+        echo "=============================================="
+    done
+fi
